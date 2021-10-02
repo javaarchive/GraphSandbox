@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Graph</title>
+    </head>
+    <body>
+        <h1>Hamilton Hypercube</h1>
+        <style>
+            #graph {
+                width: 1280px;
+                height: 720px;
+                border: 1px solid gray;
+            }
+        </style>
+        <div id="graph"></div>
+        <p id="progress">Getting ready to start visualisation...LAG WARNING</p>
+        <script src="https://pagecdn.io/lib/cytoscape/3.19.1/cytoscape.min.js"></script>
+        <script>
+            var cy = cytoscape({
+                container: document.getElementById('graph'),
+                motionBlur: true
+            });
+            function wait(ms){
+                return new Promise(function(resolve, reject){ 
+                    setTimeout(resolve, ms);
+                });
+            }
+            var nextID = 0;
+            function constructPoly(sides){
+                let nodes = [];
+                let offsetX = Math.random() * 5000 - 2500;
+                let offsetY = Math.random() * 5000 - 2500;
+                let initialID = 0, nid ,rawID;
+                for(let i = 0; i < sides; i++){
+                    let x = offsetX + Math.sin(Math.PI * 2 * i / sides) * 100;
+                    let y = offsetY + Math.cos(Math.PI * 2 * i / sides) * 100;
+                    nid = "node" + nextID;
+                    rawID = nextID;
+                    nextID ++;
+                    cy.add({
+                        group: "nodes",
+                        data: { id: nid},position:{
+                            x: x,
+                            y: y
+                        }
+                    })
+                    nodes.push({
+                        x,y,
+                        id: nid,
+                        rawID,
+                        edges: [initialID + ((i + 1)%sides)]
+                    });
+                }
+
+                for(let i = 0; i < sides; i ++){
+                    let node = nodes[i];
+                    let nextNode = nodes[(i + 1) % sides]; // cycle
+                    cy.add({
+                        group: "edges",
+                        data:{
+                            source: node.id,
+                            target: nextNode.id
+                        }
+                    })
+                }
+
+                return nodes;
+            }
+
+            function duplicateGraph(graph1){
+                    let newPoly = [];
+                    let firstNode = nextID;
+                    let offset = nextID - graph1[0].rawID;
+                    for(let node of graph1){
+                        newPoly.push({...node, id: "node" + nextID,rawID:nextID, x: node.x + firstNode * 100,
+                            y: node.y + firstNode * 100});
+                        console.log("Duping",node.id,node);
+                        cy.add({
+                        group: "nodes",
+                        data: { id:("node" + nextID)},position:{
+                            x: node.x + firstNode * 100,
+                            y: node.y + firstNode * 100
+                        }
+                        });
+                        nextID ++;
+
+                    }
+                    for(let node of graph1){
+                        node.edges.forEach((edge) => {
+                            console.log("Copying edge",edge);
+                            cy.add({
+                                group: "edges",
+                                data:{
+                                    source: "node" + (offset + node.rawID),
+                                    target: "node" + (edge + offset)
+                                }
+                            });
+                        })
+                    }
+                    return [...graph1,...newPoly];
+                }
+
+            (async function(){
+                let nodes = constructPoly(4);
+                for(let i = 0; i < 25; i ++){
+                    document.getElementById("progress").innerHTML = "Stage Progress: " + i + "/25";
+                    nodes = duplicateGraph(nodes);
+                    await wait(5000);
+                }
+            })();
+        </script>
+    </body>
+</html>

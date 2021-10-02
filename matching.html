@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Graph Viewer</title>
+    </head>
+    <body>
+        <h1>Fun with special graphs</h1>
+        <style>
+            #graph {
+                width: 1280px;
+                height: 720px;
+                border: 1px solid gray;
+            }
+        </style>
+        <div id="graph"></div>
+        <p id="progress">Initalizing</p>
+        <button onclick="randomize();">Randomize Nodes!</button> <button onclick="window.runDFS();">Run Depth-First Search</button> <br />
+        <input type="checkbox" checked id="save-images" /> Save Solutions as images <br />
+        <input type="checkbox" checked id="preview-images" /> Output Images to page (requires saving solutions to images as well) <br />
+        <input type="number" value="100" id="step-time" /> DFS Step Time (time between steps in milliseconds, this gives time for your hardware to do other stuff like updating the screen)
+        <hr />
+        <script src="https://pagecdn.io/lib/cytoscape/3.19.1/cytoscape.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha256-qXBd/EfAdjOA2FGrGAG+b3YBn2tn5A6bhz+LSgYD96k=" crossorigin="anonymous"></script>
+        <script>
+            var params = new URLSearchParams(window.location.search);
+            let useAnimations = params.get("animations");
+            let extraStyles = {};
+            const defaultStyles = {
+                'background-color': 'maroon',
+                'line-color': 'red',
+                'target-arrow-color': 'maroon',
+            }
+            if(useAnimations){
+                console.log("Enabling Animations")
+                extraStyles['transition-property'] = 'background-color, line-color, target-arrow-color';
+                extraStyles['transition-duration'] = '0.25s';
+            }
+            var cy = cytoscape({
+                container: document.getElementById('graph'),
+                motionBlur: true,
+                style: cytoscape.stylesheet()
+                .selector('node')
+                .style({
+                    'content': 'data(id)'
+                }).selector('.using')
+      .style({
+       ...defaultStyles,
+       ...extraStyles
+      })
+            });
+            
+            function wait(ms){
+                return new Promise(function(resolve, reject){ 
+                    setTimeout(resolve, ms);
+                });
+            }
+            
+            function randomize(){
+                let layout = cy.layout({
+                    name: 'random'
+                });
+
+                layout.run();
+            }
+
+            function diff(stringA,stringB){
+                let diff = 0;
+                for(let i = 0; i < stringA.length; i++){
+                    if(stringA[i] != stringB[i]){
+                        diff++;
+                    }
+                }
+                return diff;
+            }
+
+            (async function(){
+                let n = parseInt(params.get('n')) || 3;
+                let rings = [
+                    [],[],[],// 0,1,2: none
+                    ["000","001","101","111","011","010","110","100"],
+                    ["0110","0100","1100","1000","0000","0001","1001","1101","0101","0111","1111","1011","0011","0010","1010","1110"],
+                    ["10110","00110","00100","10100","11100","01100","01000","11000","10000","00000","00001","10001","11001","01001","01101","11101","10101","00101","00111","10111","11111","01111","01011","11011","10011","00011","00010","10010","11010","01010","01110","11110"]
+                ];
+                
+                let ring = rings[n];
+                let nums = ring.length;
+
+                console.log("Loading dim",n,"got",nums,"verticies");
+
+                for(let i = 0; i < nums; i++){
+                    let nodeNum = ring[i];
+                    console.log("Adding",nodeNum)
+                    cy.add({
+                        group: "nodes",
+                        data: {
+                            id: nodeNum,
+                            label: nodeNum
+                        },position:{
+                            x: 500*(Math.sin(Math.PI * 2 * i / nums)),
+                            y: 500*(Math.cos(Math.PI * 2 * i / nums))
+                        }
+                    });
+                }
+
+                /*for(let i = 0; i < nums; i ++){
+                    let nextNode = ring[(i + 1) % nums];
+                    let nodeNum1 = ring[i];
+                    cy.add({
+                        group: "edges",
+                        data: {
+                            id: nodeNum1 + "-" + nextNode,
+                            source: nodeNum1,
+                            target: nextNode,
+                            label: nodeNum1 + "-" + nextNode
+                        }
+                    })
+                }*/
+                let adjList = new Map();
+                ring.forEach((id) => {
+                    adjList.set(id,[]);
+                })
+                for(let i = 0; i < nums; i ++){
+                    for(let j = i + 1; j < nums; j ++){
+                        let nodeNum1 = ring[i];
+                        let nodeNum2 = ring[j];
+                        adjList.get(nodeNum1).push(nodeNum2);
+                        adjList.get(nodeNum2).push(nodeNum1);
+                        if(diff(nodeNum1, nodeNum2) != 1){
+                            continue;
+                        }
+                        cy.add({
+                            group: "edges",
+                            data:{
+                                id: nodeNum1 + "-" + nodeNum2,
+                                source: nodeNum1,
+                                target: nodeNum2,
+                                label: nodeNum1 + "-" + nodeNum2
+                            }
+                        });
+                    }
+                }
+
+                // Algorthim
+            async function runDFS(){
+                let sleepTime = document.getElementById("step-time").value
+                let saveSolutionsAsImages = document.getElementById("save-images").checked;
+                let previewSolutionsAsImages = document.getElementById("preview-images").checked;
+
+                // [actions, depth]
+                let dfsStack = [[[],0]];
+                let solutions = [];
+                let steps = 0;
+                while(dfsStack.length > 0){
+                    steps ++;
+                    document.getElementById("progress").innerText = "Depth First Search Steps: " + steps;
+                    cy.$(".using").removeClass("using");
+                    let [path,depth] = dfsStack.shift();
+
+                    // highlight our current path
+                    path.forEach((pair) => {
+                        let [a,b] = pair;
+                        let edge = cy.getElementById(a + "-" + b) || cy.getElementById(b + "-" + a);
+                        edge.addClass("using");
+                    })
+
+                    // set of nodes we already used
+
+                    let usedNodes = new Set();
+
+                    path.map(pair => {
+                        usedNodes.add(pair[0]);
+                        usedNodes.add(pair[1]);
+                    });
+                    let avalible = ring.filter((id) => {
+                        return !usedNodes.has(id);
+                    });
+
+                    
+
+                    for(let i = 0; i < avalible.length; i ++){
+                        for(let j = i + 1; j < avalible.length; j ++){
+                            let nodeNum1 = avalible[i];
+                            let nodeNum2 = avalible[j];
+                            if(diff(nodeNum1, nodeNum2) != 1){
+                                continue;
+                            }
+                            let pathCopy = _.cloneDeep(path);
+                            pathCopy.push([nodeNum1,nodeNum2]);
+                            console.log("Path",pathCopy);
+                            dfsStack.unshift([pathCopy,depth + 1]);
+                        }
+                    }
+
+                    if(avalible.length > 0){
+                        solutions.push(path);
+                    }
+
+                    await wait(10);
+                }
+            }
+            window.runDFS = runDFS;
+            })();
+
+        
+            
+        </script>
+        <p>
+            Tip: Add &animations=1 to enable animations for less flashing (but less usable results)
+        </p>
+    </body>
+</html>
