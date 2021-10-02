@@ -19,6 +19,9 @@
         <input type="checkbox" checked id="preview-images" /> Output Images to page (requires saving solutions to images as well) <br />
         <input type="number" value="100" id="step-time" /> DFS Step Time (time between steps in milliseconds, this gives time for your hardware to do other stuff like updating the screen)
         <hr />
+        <p>
+            Tip: Add &animations=1 to enable animations for less flashing (but less usable results)
+        </p>
         <script src="https://pagecdn.io/lib/cytoscape/3.19.1/cytoscape.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha256-qXBd/EfAdjOA2FGrGAG+b3YBn2tn5A6bhz+LSgYD96k=" crossorigin="anonymous"></script>
         <script>
@@ -46,7 +49,11 @@
       .style({
        ...defaultStyles,
        ...extraStyles
-      })
+      }).selector(".finalmatching").style({
+        'background-color': 'blue',
+        'line-color': 'blue',
+        'target-arrow-color': 'blue',
+     })
             });
             
             function wait(ms){
@@ -204,8 +211,5 @@
         
             
         </script>
-        <p>
-            Tip: Add &animations=1 to enable animations for less flashing (but less usable results)
-        </p>
     </body>
 </html>
