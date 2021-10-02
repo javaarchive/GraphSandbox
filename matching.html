@@ -11,19 +11,34 @@
                 height: 720px;
                 border: 1px solid gray;
             }
+
+            .matching-image{
+                float: left;
+                width: 340px;
+                padding: 4px;
+            }
         </style>
         <div id="graph"></div>
         <p id="progress">Initalizing</p>
-        <button onclick="randomize();">Randomize Nodes!</button> <button onclick="window.runDFS();">Run Depth-First Search</button> <br />
+        <button onclick="randomize();">Randomize Nodes!</button> <button onclick="window.runDFS();">Run Depth-First Search</button> <button onclick="window.genArchive();">Generate Archive of Matching Images</button> <br />
         <input type="checkbox" checked id="save-images" /> Save Solutions as images <br />
         <input type="checkbox" checked id="preview-images" /> Output Images to page (requires saving solutions to images as well) <br />
         <input type="number" value="100" id="step-time" /> DFS Step Time (time between steps in milliseconds, this gives time for your hardware to do other stuff like updating the screen)
         <hr />
         <p>
-            Tip: Add &animations=1 to enable animations for less flashing (but less usable results)
+            Tip: Add &animations=1 to the url to enable animations for less flashing (but less usable results), right click a matching and click "open in new tab" to view the matching fullscreen. If you hover over a matching for a while, a list of edge connections will be shown.
         </p>
+        <p>
+            Quick Links: <a href="matching.html?n=3">3 Dimensions</a>, <a href="matching.html?n=4">4 Dimensions</a>, <a href="matching.html?n=5">5 Dimensions</a>
+        </p>
+        <div id="matchings">
+            <p>
+                Found matchings appear here
+            </p>
+        </div>
         <script src="https://pagecdn.io/lib/cytoscape/3.19.1/cytoscape.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js" integrity="sha256-qXBd/EfAdjOA2FGrGAG+b3YBn2tn5A6bhz+LSgYD96k=" crossorigin="anonymous"></script>
+        <script src="https://stuk.github.io/jszip/dist/jszip.js"></script>
         <script>
             var params = new URLSearchParams(window.location.search);
             let useAnimations = params.get("animations");
@@ -41,6 +56,8 @@
             var cy = cytoscape({
                 container: document.getElementById('graph'),
                 motionBlur: true,
+                zoom: 0.5,
+                pan: { x: 500, y: 300 },
                 style: cytoscape.stylesheet()
                 .selector('node')
                 .style({
@@ -70,6 +87,10 @@
                 layout.run();
             }
 
+            function normalizePath(path){
+                return path.map(pair => pair[0] + "-" + pair[1]).sort().join(",");
+            }
+
             function diff(stringA,stringB){
                 let diff = 0;
                 for(let i = 0; i < stringA.length; i++){
@@ -78,6 +99,13 @@
                     }
                 }
                 return diff;
+            }
+
+            function downloadFile(url,filename = "export.zip"){
+                let a = document.createElement("a");
+                a.href = url;
+                a.download = filename;
+                a.click();
             }
 
             (async function(){
@@ -130,6 +158,7 @@
                     for(let j = i + 1; j < nums; j ++){
                         let nodeNum1 = ring[i];
                         let nodeNum2 = ring[j];
+                        [nodeNum1,nodeNum2] = [nodeNum1,nodeNum2].sort();
                         adjList.get(nodeNum1).push(nodeNum2);
                         adjList.get(nodeNum2).push(nodeNum1);
                         if(diff(nodeNum1, nodeNum2) != 1){
@@ -147,6 +176,15 @@
                     }
                 }
 
+                window.genArchive = () => {
+                    alert("You need to perform a search first. ");
+                }
+
+                function resetMarkings(){
+                    cy.$(".using").removeClass("using");
+                    cy.$(".finalmatching").removeClass("finalmatching");
+                }
+
                 // Algorthim
             async function runDFS(){
                 let sleepTime = document.getElementById("step-time").value
@@ -155,12 +193,27 @@
 
                 // [actions, depth]
                 let dfsStack = [[[],0]];
-                let solutions = [];
+                
+                let exploredStates = new Set();
+                
+                let matchings = [];
+                let matchingBlobs = [];
                 let steps = 0;
+
+                window.genArchive = function(){
+                    let zip = new JSZip();
+                    matchingBlobs.forEach((blob,i) => {
+                        zip.file("matching" + i + ".png", blob);
+                    });
+                    zip.generateAsync({type:"blob"}).then(function(content){
+                        downloadFile(URL.createObjectURL(content),"matchings_" + matchings.length + "_count.zip");
+                    });
+                }
+
                 while(dfsStack.length > 0){
                     steps ++;
-                    document.getElementById("progress").innerText = "Depth First Search Steps: " + steps;
-                    cy.$(".using").removeClass("using");
+                    document.getElementById("progress").innerText = "Depth First Search Steps: " + steps + " Matchings found: "  +matchings.length;
+                    resetMarkings();
                     let [path,depth] = dfsStack.shift();
 
                     // highlight our current path
@@ -188,18 +241,63 @@
                         for(let j = i + 1; j < avalible.length; j ++){
                             let nodeNum1 = avalible[i];
                             let nodeNum2 = avalible[j];
+
                             if(diff(nodeNum1, nodeNum2) != 1){
                                 continue;
                             }
+
                             let pathCopy = _.cloneDeep(path);
-                            pathCopy.push([nodeNum1,nodeNum2]);
+
+                            pathCopy.push([nodeNum1,nodeNum2].sort());
+
+                            let pathString = normalizePath(pathCopy);
+
+                            // Duplicate Removal
+                            if(exploredStates.has(pathString)){
+                                continue;
+                            }
+                            exploredStates.add(pathString);
+
                             console.log("Path",pathCopy);
                             dfsStack.unshift([pathCopy,depth + 1]);
                         }
                     }
 
-                    if(avalible.length > 0){
-                        solutions.push(path);
+                    if(avalible.length == 0){
+                        console.log("Found matching",path);
+                        if(saveSolutionsAsImages){
+                            await wait(sleepTime);
+                            
+                            resetMarkings();
+
+                            path.forEach((pair) => {
+                                let [a,b] = pair;
+                                let edge = cy.getElementById(a + "-" + b) || cy.getElementById(b + "-" + a);
+                                console.log("Drawing prepartion",a,b,"marked",edge);
+                                edge.addClass("finalmatching");
+                            })
+
+                            let imgBlob = await cy.png({
+                                output: "blob-promise",
+                                full: true
+                            });
+
+                            matchingBlobs.push(imgBlob);
+
+                            if(previewSolutionsAsImages){
+                                let img = document.createElement("img");
+                                img.src = URL.createObjectURL(imgBlob);
+                                img.className = "matching-image";
+                                img.setAttribute("data-path", JSON.stringify(path));
+                                img.setAttribute("title", path.map(pair => {
+                                    return pair[0] + "-" + pair[1];
+                                }).join(" ")
+                                );
+                                document.getElementById("matchings").appendChild(img);
+                            }
+
+                        }
+                        matchings.push(path);
                     }
 
                     await wait(10);
