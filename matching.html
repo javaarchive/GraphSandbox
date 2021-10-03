@@ -1,14 +1,24 @@
 <!DOCTYPE html>
 <html>
     <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+
         <title>Graph Viewer</title>
     </head>
     <body>
         <h1>Fun with special graphs</h1>
         <style>
+        html, body {
+            width: 90%;
+            height: 90%;
+        }
+
             #graph {
-                width: 1280px;
-                height: 720px;
+                width: 100%;
+                height: 100%;
+                resize: both;
+                overflow: auto;
                 border: 1px solid gray;
             }
 
@@ -26,7 +36,7 @@
 
         <div id="graph"></div>
         <p id="progress">Initalizing</p>
-        <button onclick="randomize();">Randomize Nodes!</button> <button onclick="window.runDFS();">Run Depth-First Search</button> <button onclick="window.genArchive();">Generate Archive of Matching Images</button> <br />
+        <button onclick="randomize();">Randomize Nodes!</button> <button onclick="window.runDFS();">Run Depth-First Search</button> <button onclick="window.genArchive();">Generate Archive of Matching Images</button> <button onclick="downloadCurrentGraphPNG()">Export Current Graph State as PNG</button> <button onclick="resetMarkings();">Reset Edge Colorings</button> <br />
         <input type="checkbox" checked id="save-images" /> Save Solutions as images <br />
         <input type="checkbox" checked id="preview-images" /> Output Images to page (requires saving solutions to images as well) <br />
         <input type="number" value="100" id="step-time" /> DFS Step Time (time between steps in milliseconds, this gives time for your hardware to do other stuff like updating the screen)
@@ -121,6 +131,19 @@
                 a.click();
             }
 
+            async function downloadCurrentGraphPNG(){
+                let pngBlob = await cy.png({
+                    full: true,
+                    output: "blob-promise"
+                });
+                downloadFile(URL.createObjectURL(pngBlob),"graph_export.png");
+            }
+
+            function resetMarkings(){
+                    cy.$(".using").removeClass("using");
+                    cy.$(".finalmatching").removeClass("finalmatching");
+                }
+
             (async function(){
                 let n = parseInt(params.get('n')) || 3;
                 let rings = [
@@ -196,11 +219,6 @@
 
                 window.genArchive = () => {
                     alert("You need to perform a search first. ");
-                }
-
-                function resetMarkings(){
-                    cy.$(".using").removeClass("using");
-                    cy.$(".finalmatching").removeClass("finalmatching");
                 }
 
                 // Algorthim
@@ -324,7 +342,9 @@
             window.runDFS = runDFS;
             })();
 
-        
+            setIntveral(function(){
+                cy.resize();
+            },10);
             
         </script>
     </body>
