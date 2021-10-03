@@ -14,16 +14,24 @@
 
             .matching-image{
                 float: left;
-                width: 340px;
                 padding: 4px;
             }
         </style>
+
+        <style id="matching-css">
+            .matching-image {
+                width: 350px;
+            }
+        </style>
+
         <div id="graph"></div>
         <p id="progress">Initalizing</p>
         <button onclick="randomize();">Randomize Nodes!</button> <button onclick="window.runDFS();">Run Depth-First Search</button> <button onclick="window.genArchive();">Generate Archive of Matching Images</button> <br />
         <input type="checkbox" checked id="save-images" /> Save Solutions as images <br />
         <input type="checkbox" checked id="preview-images" /> Output Images to page (requires saving solutions to images as well) <br />
         <input type="number" value="100" id="step-time" /> DFS Step Time (time between steps in milliseconds, this gives time for your hardware to do other stuff like updating the screen)
+        <br />
+        <input type="range" min="200" max="600" value="350" class="slider" id="matching-image-size" onchange="setMatchingImageSize(this)" oninput="setMatchingImageSize(this)" /> Matching Image Size
         <hr />
         <p>
             Tip: Add &animations=1 to the url to enable animations for less flashing (but less usable results), right click a matching and click "open in new tab" to view the matching fullscreen. If you hover over a matching for a while, a list of edge connections will be shown.
@@ -33,7 +41,7 @@
         </p>
         <div id="matchings">
             <p>
-                Found matchings appear here
+                Found matchings appear here:
             </p>
         </div>
         <script src="https://pagecdn.io/lib/cytoscape/3.19.1/cytoscape.min.js"></script>
@@ -72,6 +80,11 @@
         'target-arrow-color': 'blue',
      })
             });
+
+            function setMatchingImageSize(ev){
+                let newSize = document.getElementById("matching-image-size").value;
+                document.getElementById('matching-css').innerText = ".matching-image{width:" + newSize + "px;}";
+            }
             
             function wait(ms){
                 return new Promise(function(resolve, reject){ 
